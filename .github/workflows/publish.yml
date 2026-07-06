@@ -1,0 +1,28 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          # Registers a <server> entry named "github" in the runner's settings.xml,
+          # pointing at GITHUB_TOKEN — matches the <id>github</id> repository in pom.xml.
+          server-id: github
+          settings-path: ${{ github.workspace }}
+
+      - name: Publish to GitHub Packages
+        run: mvn -B -s $GITHUB_WORKSPACE/settings.xml deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

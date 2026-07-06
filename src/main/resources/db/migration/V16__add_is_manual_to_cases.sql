@@ -1,0 +1,2 @@
+ALTER TABLE cases
+    ADD COLUMN is_manual BIT NOT NULL DEFAULT 0;

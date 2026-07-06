@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.lghj.v2</groupId>
+    <artifactId>db-migrations</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>lghj-v2-db-migrations</name>
+    <description>
+        Single source of truth for the lgh_system_v2 Flyway migrations shared by
+        lghj-v2-admin-api and lghj-v2-public-api. Consumers depend on this jar
+        instead of keeping their own copy of src/main/resources/db/migration —
+        Flyway's classpath:db/migration scanning picks up migrations from any
+        jar on the classpath, including this one.
+    </description>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/MIRAISEI/lghj-v2-db-migrations</url>
+        </repository>
+    </distributionManagement>
+
+</project>
