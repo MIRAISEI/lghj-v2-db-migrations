@@ -3,6 +3,9 @@ name: Publish
 on:
   push:
     branches: [main]
+    paths:
+      - "pom.xml"
+      - "src/main/resources/db/migration/**"
 
 jobs:
   publish:
