@@ -6,7 +6,7 @@
 
     <groupId>com.lghj.v2</groupId>
     <artifactId>db-migrations</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <packaging>jar</packaging>
 
     <name>lghj-v2-db-migrations</name>
