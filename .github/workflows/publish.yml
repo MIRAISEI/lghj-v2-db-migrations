@@ -2,7 +2,7 @@ name: Publish
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - "pom.xml"
       - "src/main/resources/db/migration/**"
