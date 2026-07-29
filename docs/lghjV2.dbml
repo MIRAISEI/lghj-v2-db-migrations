@@ -775,7 +775,7 @@ Table notifications {
 
 // ===== BLOG (V51) =====
 
-Table articles {
+Table blog_articles {
   id bigint [pk, increment, not null]
   title varchar(255) [not null]
   introduction text
@@ -788,7 +788,7 @@ Table articles {
   updated_at datetime [not null]
 }
 
-Table art_tags {
+Table blog_tags {
   id bigint [pk, increment, not null]
   name varchar(255) [not null]
   slug varchar(255) [not null, unique]
@@ -799,7 +799,7 @@ Table art_tags {
   updated_at datetime [not null]
 }
 
-Table article_art_tags {
+Table blog_article_tags {
   id bigint [pk, increment, not null]
   article_id bigint [not null]
   art_tag_id bigint [not null]
@@ -902,5 +902,5 @@ Ref: stock_price_inquiries.user_id > users.id
 Ref: notifications.user_id > users.id [delete: cascade]
 
 // Blog
-Ref: article_art_tags.article_id > articles.id [delete: cascade]
-Ref: article_art_tags.art_tag_id > art_tags.id [delete: cascade]
+Ref: blog_article_tags.article_id > blog_articles.id [delete: cascade]
+Ref: blog_article_tags.art_tag_id > blog_tags.id [delete: cascade]

@@ -1,8 +1,8 @@
 # Database Design — `lgh_system_v2`
 
 **Status:** current as of `db-migrations` V48 (`V48__user_communication_preferences_schema.sql`), plus V51
-(`V51__articles_schema.sql`, blog domain), 2026-07-29. **V49/V50** (vendor & destination master-data tables)
-are not yet reflected in this document.
+(`V51__articles_schema.sql`, blog domain), 2026-07-29. **V49/V50/V52** (vendor & destination master-data
+tables, and the V52 booking-companies consolidation) are not yet reflected in this document.
 
 ## Source of truth
 
@@ -50,7 +50,7 @@ Whenever a migration is added to this repo:
 | Auto parts | `auto_parts`, `auto_part_images`, `auto_part_prices`, `auto_part_tags`, `auto_parts_inquiries`, `auto_parts_meta` |
 | Public stock site support | `stock_vehicle_views`, `stock_price_inquiries` |
 | Notifications | `notifications` |
-| Blog | `articles`, `art_tags`, `article_art_tags` |
+| Blog | `blog_articles`, `blog_tags`, `blog_article_tags` |
 
 Cross-domain link: a won bid in **Case management** can be "promoted" into **Manual inventory**
 (`inventory_vehicles.case_vehicle_id` / `.source_case_id`, loosely coupled — see gotcha #12 below).
@@ -249,9 +249,9 @@ that repo's `AuctionCacheService`-style caching for brands/models/grades/colors/
 
 | Table | Purpose | Key columns | FKs |
 |---|---|---|---|
-| `articles` | Blog post/article managed via the Admin Portal, consumed by the public site once published | `slug` UNIQUE; `status` default `0` (0=draft, 1=published); soft-deleted via `deleted_at` | none |
-| `art_tags` | Blog tag catalog (independent of `vehicle_tags` — this is content taxonomy, not vehicle taxonomy) | `slug` UNIQUE; `status` default `0` (0=draft, 1=active); soft-deleted via `deleted_at` | none |
-| `article_art_tags` | Article↔tag join | UNIQUE(`article_id`,`art_tag_id`) | `article_id`→articles.id (CASCADE); `art_tag_id`→art_tags.id (CASCADE) |
+| `blog_articles` | Blog post/article managed via the Admin Portal, consumed by the public site once published | `slug` UNIQUE; `status` default `0` (0=draft, 1=published); soft-deleted via `deleted_at` | none |
+| `blog_tags` | Blog tag catalog (independent of `vehicle_tags` — this is content taxonomy, not vehicle taxonomy) | `slug` UNIQUE; `status` default `0` (0=draft, 1=active); soft-deleted via `deleted_at` | none |
+| `blog_article_tags` | Article↔tag join | UNIQUE(`article_id`,`art_tag_id`) | `article_id`→blog_articles.id (CASCADE); `art_tag_id`→blog_tags.id (CASCADE) |
 
 Permissions: `ARTICLE_READ`/`ARTICLE_WRITE`/`ARTICLE_DELETE` (V51), granted in full to `ADMIN`.
 
@@ -274,7 +274,8 @@ Numbered for reference; check this list before writing code that assumes "obviou
 11. **Stripe/Orders domain has inconsistent FK discipline.** `payments`, `payment_events`, `refunds`, `subscriptions`, `subscription_items` only index their relational columns (`order_id`, `payment_id`, `user_id`, `subscription_id`) rather than declaring real FK constraints, unlike almost every other domain. Treat these as soft references — don't rely on the DB to enforce referential integrity here.
 12. **Case Management ↔ Manual Inventory is intentionally loosely coupled.** `inventory_vehicles.case_vehicle_id`/`.source_case_id` have no FK constraint, so promoting/archiving a case never hard-blocks on inventory records (and vice versa).
 13. **Two external vehicle-ID patterns, neither FK'd internally**: `user_favourite_items.vehicle_id` (VARCHAR) and `case_vehicles.vehicle_id` (CHAR(36)) both point at vehicles in an external AVTO auction catalog this database doesn't own.
-14. **V51's `art_tags` is a deliberately separate tag catalog from `vehicle_tags`**, not a reuse of it (unlike `auto_part_tags`/`inventory_vehicle_tags`, which both point at `vehicle_tags`). Blog content tags and vehicle/parts tags are different taxonomies that happen to share a shape — don't conflate `art_tag_id` with `tag_id` elsewhere in the schema.
+14. **V51's `blog_tags` is a deliberately separate tag catalog from `vehicle_tags`**, not a reuse of it (unlike `auto_part_tags`/`inventory_vehicle_tags`, which both point at `vehicle_tags`). Blog content tags and vehicle/parts tags are different taxonomies that happen to share a shape — don't conflate `art_tag_id` with `tag_id` elsewhere in the schema.
+15. **V51's tables were renamed in place** (`articles`→`blog_articles`, `art_tags`→`blog_tags`, `article_art_tags`→`blog_article_tags`), editing the V51 file directly rather than shipping a follow-up rename migration — even though `1.5.0` was already published to GitHub Packages with the old names. Judged safe only because no application code had shipped against the old names yet; required a manual local-DB reset (drop + re-migrate) since Flyway checksums/history for any DB that had already applied the old V51 would otherwise no longer match. Prefer "fix forward" (a new migration) over editing a published migration once real data/consumers exist — this was a narrow, deliberate exception.
 
 Related: as of this writing, local dev environments for `admin-api`/`public-api` can't run `flyway migrate`
 past V47 until pre-existing `inventory_vehicles.stock_id` duplicates in the local dev DB are cleaned up
