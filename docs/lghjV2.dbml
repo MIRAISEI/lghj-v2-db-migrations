@@ -1,0 +1,906 @@
+Project lghj_v2 {
+  database_type: "MySQL"
+  Note: "lgh_system_v2 — full schema as of Flyway migration V48 in this repo's src/main/resources/db/migration. See docs/DATABASE_DESIGN.md for narrative context, RBAC seed history, and schema-evolution gotchas. Regenerate this file whenever a new migration changes the schema."
+}
+
+// ===== AUTH & RBAC (V1) =====
+
+Table roles {
+  id char(36) [pk, not null, note: "UUID"]
+  name varchar(64) [not null, unique, note: "ADMIN | BIDDING | SALES | FINANCE | SHIPPING | CUSTOMER | SUPPORT"]
+  is_locked boolean [not null, default: false, note: "added V13"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table permissions {
+  id char(36) [pk, not null, note: "UUID"]
+  name varchar(64) [not null, unique, note: "<DOMAIN>_<ACTION>, see DATABASE_DESIGN.md for full growth history"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table user_roles {
+  user_id char(36) [not null]
+  role_id char(36) [not null]
+  indexes { (user_id, role_id) [pk] }
+}
+
+Table role_permissions {
+  role_id char(36) [not null]
+  permission_id char(36) [not null]
+  indexes { (role_id, permission_id) [pk] }
+}
+
+// ===== USERS, PROFILE, RECOVERY & PREFERENCES (V1, V3, V7, V9, V10, V11, V19, V48) =====
+
+Table users {
+  id char(36) [pk, not null, note: "UUID"]
+  username varchar(80) [not null, unique]
+  email varchar(255) [not null, unique]
+  email_verified_at datetime
+  password varchar(255) [not null]
+  status varchar(32) [not null, note: "UNVERIFIED | PENDING | ACTIVE | SUSPENDED | LOCKED | CLOSED"]
+  stripe_customer_id varchar(255) [unique, note: "added V11"]
+  payment_method_configured bit [note: "added V11"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table users_meta {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  meta_key varchar(100) [not null]
+  meta_value text
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes {
+    (user_id, meta_key) [unique]
+    meta_key
+  }
+}
+
+Table user_status_history {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  previous_status varchar(32)
+  new_status varchar(32) [not null]
+  reason varchar(255)
+  changed_at datetime [not null]
+}
+
+Table otp_tokens {
+  id char(36) [pk, not null, note: "UUID"]
+  email varchar(255) [not null]
+  otp varchar(20) [not null]
+  expires_at datetime [not null]
+  used boolean [not null, default: false]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { (email, used, expires_at) }
+}
+
+Table email_verification_tokens {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  token varchar(255) [not null, unique]
+  expires_at datetime [not null]
+  created_at datetime [not null]
+}
+
+Table password_reset_tokens {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  token varchar(255) [not null, unique]
+  expires_at datetime [not null]
+  created_at datetime [not null]
+}
+
+Table recovery_codes {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  code_hash varchar(255) [not null]
+  used_at datetime
+  created_at datetime [not null]
+}
+
+Table recovery_questions {
+  id int [pk, increment, not null]
+  question varchar(255) [not null, unique]
+  created_at datetime [not null]
+}
+
+Table user_recovery_answers {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  question_id int [not null]
+  answer_hash varchar(255) [not null]
+  created_at datetime [not null]
+  indexes { (user_id, question_id) [unique] }
+}
+
+Table session_termination_logs {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  reason varchar(255)
+  terminated_at datetime [not null]
+}
+
+Table user_consents {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null, unique]
+  terms_accepted_at datetime
+  privacy_accepted_at datetime
+  marketing_opt_in boolean
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table user_communication_preferences {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null, unique]
+  email_enabled boolean [default: true]
+  sms_enabled boolean [default: false]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  note: "added V48"
+}
+
+Table user_favourite_items {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  vehicle_id varchar(36) [not null, note: "external AVTO vehicle id, not FK'd"]
+  vehicle_type varchar(16) [not null, note: "CAR | BIKE"]
+  group_name char(1) [not null, note: "A | B | C | D | E"]
+  status varchar(16) [not null, note: "ACTIVE | REMOVED"]
+  created_at datetime [not null]
+  indexes { (user_id, vehicle_id, status) [unique] }
+}
+
+// ===== AUDIT LOGGING & PUBLIC FORMS (V2, V17, V18) =====
+
+Table audit_logs {
+  id char(36) [pk, not null, note: "UUID"]
+  event_type varchar(64) [not null]
+  email varchar(255)
+  ip_address varchar(64)
+  status varchar(32)
+  created_at datetime [not null]
+  indexes {
+    email
+    event_type
+    (ip_address, created_at)
+  }
+}
+
+Table contact_messages {
+  id char(36) [pk, not null, note: "UUID"]
+  name varchar(255)
+  email varchar(255)
+  message text
+  created_at datetime [not null]
+}
+
+Table newsletter_subscribers {
+  id char(36) [pk, not null, note: "UUID"]
+  email varchar(255) [not null, unique]
+  created_at datetime [not null]
+}
+
+// ===== ORDERS — generic (V4) =====
+
+Table orders {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  status int [not null]
+  deleted_at datetime [note: "soft delete"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table order_items {
+  id char(36) [pk, not null, note: "UUID"]
+  order_id char(36) [not null]
+  status int [not null]
+  type int [not null]
+  qty int [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table order_statuses {
+  id char(36) [pk, not null, note: "UUID"]
+  order_id char(36) [not null]
+  user_id char(36)
+  status int [not null]
+  created_at datetime [not null]
+}
+
+Table order_item_statuses {
+  id char(36) [pk, not null, note: "UUID"]
+  order_item_id char(36) [not null]
+  user_id char(36)
+  status int [not null]
+  created_at datetime [not null]
+}
+
+Table order_documents {
+  id char(36) [pk, not null, note: "UUID"]
+  order_id char(36) [not null]
+  type int [not null]
+  status int [not null]
+  file_path varchar(500)
+  created_at datetime [not null]
+}
+
+// ===== STRIPE / PAYMENTS / SUBSCRIPTIONS (V5, V8) =====
+// NOTE: unlike every other domain, these tables index their relational columns
+// instead of declaring real FK constraints — see DATABASE_DESIGN.md gotcha #11.
+
+Table payments {
+  id char(36) [pk, not null, note: "UUID"]
+  order_id char(36) [note: "soft reference, no FK constraint"]
+  user_id char(36) [note: "soft reference, no FK constraint"]
+  stripe_payment_intent_id varchar(255) [unique]
+  idempotency_key varchar(255)
+  amount decimal(15,2)
+  status varchar(32)
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table payment_events {
+  id char(36) [pk, not null, note: "UUID"]
+  payment_id char(36) [note: "soft reference, no FK constraint"]
+  stripe_event_id varchar(255) [unique]
+  event_type varchar(64)
+  payload json
+  created_at datetime [not null]
+}
+
+Table refunds {
+  id char(36) [pk, not null, note: "UUID"]
+  payment_id char(36) [note: "soft reference, no FK constraint"]
+  amount decimal(15,2)
+  status varchar(32)
+  created_at datetime [not null]
+}
+
+Table subscriptions {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [note: "soft reference, no FK constraint"]
+  stripe_id varchar(255) [unique]
+  stripe_status varchar(32)
+  ends_at datetime
+  updated_at datetime [not null]
+  created_at datetime [not null]
+  indexes { (user_id, stripe_status) }
+}
+
+Table subscription_items {
+  id char(36) [pk, not null, note: "UUID"]
+  subscription_id char(36) [note: "soft reference, no FK constraint"]
+  membership_package_id char(36) [note: "soft reference, no FK constraint"]
+  stripe_id varchar(255) [unique]
+  stripe_price varchar(255)
+  quantity int
+  created_at datetime [not null]
+  indexes { (subscription_id, stripe_price) [unique] }
+}
+
+Table subscription_events {
+  id char(36) [pk, not null, note: "UUID"]
+  subscription_id char(36) [note: "nullable, soft reference, no FK constraint"]
+  stripe_event_id varchar(255) [unique]
+  event_type varchar(64)
+  payload json
+  created_at datetime [not null]
+}
+
+// ===== CASE MANAGEMENT — auction bidding workflow (V6, altered V14/V15/V16/V21(data)/V25/V46) =====
+// V6 is a squashed baseline; internal comments reference "(V5)/(V6)/(V7)" waves that
+// no longer exist as separate files. See DATABASE_DESIGN.md for the full case status
+// state-machine redesign (V21) and other gotchas.
+
+Table cases {
+  id char(36) [pk, not null, note: "UUID"]
+  customer_id char(36) [not null]
+  created_by_user_id char(36)
+  customer_assigned_by_admin_id char(36)
+  status varchar(50) [not null, default: "DRAFT", note: "see DATABASE_DESIGN.md case status state machine"]
+  is_manual bit [note: "added V16"]
+  total_cif_amount decimal(15,2)
+  total_deposit_required decimal(15,2)
+  total_lc_amount decimal(15,2)
+  total_balance_amount decimal(15,2)
+  total_paid_amount decimal(15,2)
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes {
+    customer_id
+    status
+    (customer_id, status)
+    created_at
+  }
+}
+
+Table case_bid_groups {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  bid_group_id varchar(255) [not null, note: "external customer_bids_groups id, not FK'd"]
+  num_vehicles_included int
+  num_vehicles_required int [note: "added V15"]
+  max_bid_value decimal(15,2)
+  group_remarks text
+  created_at datetime [not null]
+  indexes {
+    case_id
+    (case_id, bid_group_id) [unique]
+  }
+}
+
+Table case_vehicles {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  vehicle_id char(36) [note: "external AVTO auction vehicle id, not FK'd"]
+  vehicle_status varchar(32) [note: "PENDING | IN_BIDDING | BID_WIN | BID_LOSS | IGNORED | IN_INVENTORY (added V25)"]
+  cif_breakdown_json json
+  metadata_json json
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { case_id }
+
+  Note: "bid_date VARCHAR column (free-text) existed here until V46, migrated into case_vehicle_metadata as auction_date/auction_time, then dropped"
+}
+
+Table case_bid_group_vehicles {
+  case_bid_group_id char(36) [not null]
+  case_vehicle_id char(36) [not null]
+  position_in_group int
+  indexes { (case_bid_group_id, case_vehicle_id) [pk] }
+  Note: "composite PK since V14 — original standalone `id` PK broke Hibernate @ManyToMany join-table inserts"
+}
+
+Table case_vehicle_metadata {
+  id char(36) [pk, not null, note: "UUID"]
+  case_vehicle_id char(36) [not null]
+  meta_key varchar(100) [not null]
+  meta_value text
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { meta_key }
+}
+
+Table case_documents {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  case_vehicle_id char(36) [note: "nullable"]
+  document_type varchar(100) [not null]
+  file_path varchar(500)
+  verification_status varchar(50) [note: "PENDING | APPROVED | REJECTED"]
+  uploaded_by_user_id char(36)
+  verified_by_user_id char(36)
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes {
+    case_id
+    document_type
+  }
+}
+
+Table case_advance_payments {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  required_by_admin_id char(36)
+  verified_by_finance_id char(36)
+  payment_proof_document_id char(36)
+  amount_required decimal(15,2)
+  verification_status varchar(50) [note: "PENDING | VERIFIED | REJECTED"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table case_bid_group_remarks {
+  id varchar(36) [pk, not null]
+  case_bid_group_id char(36) [not null, unique]
+  remarks text
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table case_shipments {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  shipment_status varchar(50) [note: "PENDING | IN_YARD | INSPECTING | BOOKED | IN_TRANSIT | DELIVERED"]
+  eta datetime
+  etd datetime
+  vessel_name varchar(100)
+  port_of_origin varchar(100)
+  port_of_destination varchar(100)
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes {
+    case_id
+    shipment_status
+    etd
+    eta
+  }
+}
+
+Table case_shipment_vehicles {
+  id char(36) [pk, not null, note: "UUID"]
+  shipment_id char(36) [not null]
+  case_vehicle_id char(36) [not null]
+  inspection_result varchar(50) [note: "PENDING | PASS | FAIL"]
+  inspection_date datetime
+  inspection_notes text
+  created_at datetime [not null]
+  indexes {
+    shipment_id
+    (case_vehicle_id, shipment_id) [unique]
+  }
+}
+
+Table case_status_history {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  from_status varchar(50)
+  to_status varchar(50) [not null]
+  changed_by_user_id char(36)
+  acte_by_user_id char(36)
+  reason text
+  created_at datetime(6) [not null, note: "microsecond precision for stable ordering"]
+  indexes {
+    case_id
+    to_status
+    created_at
+  }
+
+  Note: "historical rows may hold status strings from before the V21 redesign (e.g. SUBMITTED, DEPOSIT_SUBMITTED, DEPOSIT_VERIFIED) — not guaranteed to match the current status enum"
+}
+
+Table case_messages {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  case_vehicle_id char(36) [note: "nullable"]
+  sender_user_id char(36)
+  message_type varchar(50) [note: "USER_MESSAGE | SYSTEM_NOTE | STATUS_CHANGE"]
+  content text [not null]
+  visibility varchar(50) [note: "CUSTOMER_AND_STAFF | STAFF_ONLY"]
+  created_at datetime [not null]
+  indexes {
+    case_id
+    created_at
+  }
+}
+
+Table case_activities {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  case_vehicle_id char(36) [note: "nullable"]
+  actor_user_id char(36)
+  activity_type varchar(100) [not null]
+  metadata_json json
+  created_at datetime(6) [not null, note: "microsecond precision"]
+  indexes {
+    case_id
+    activity_type
+    created_at
+  }
+}
+
+Table case_staff_assignments {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  assigned_to_user_id char(36)
+  assigned_by_user_id char(36)
+  role varchar(100) [not null, note: "BIDDING | SALES | FINANCE | SHIPPING"]
+  assigned_at datetime [not null]
+  indexes {
+    case_id
+    assigned_to_user_id
+  }
+}
+
+Table case_feedback {
+  id char(36) [pk, not null, note: "UUID"]
+  case_vehicle_id char(36) [not null, unique]
+  submitted_by_user_id char(36)
+  rating int [note: "1-5 stars"]
+  comment text
+  submitted_at datetime
+}
+
+// ===== MANUAL INVENTORY — vehicle stock (V22, V23, V24, altered V33, V47) =====
+
+Table inventory_vehicles {
+  id char(36) [pk, not null, default: `(UUID())`]
+  stock_id varchar(255) [not null, unique, note: "NOT NULL + UNIQUE since V47, see DATABASE_DESIGN.md gotcha #9 re: required backfill"]
+  case_vehicle_id char(36) [note: "soft reference to case_vehicles when promoted from a won bid, no FK constraint"]
+  source_case_id char(36) [note: "soft reference to cases for navigation, no FK constraint"]
+  status varchar(50) [not null, default: "ACTIVE"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes {
+    case_vehicle_id
+    source_case_id
+  }
+}
+
+Table inventory_vehicle_metadata {
+  id char(36) [pk, not null, note: "UUID"]
+  vehicle_id char(36) [not null]
+  meta_key varchar(100) [not null]
+  meta_value text
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { meta_key }
+}
+
+Table inventory_images {
+  id char(36) [pk, not null, note: "UUID"]
+  vehicle_id char(36) [not null]
+  url varchar(500) [not null]
+  is_primary boolean [default: false]
+  sort_order int
+  created_at datetime [not null]
+}
+
+Table inventory_videos {
+  id char(36) [pk, not null, note: "UUID"]
+  vehicle_id char(36) [not null]
+  url varchar(500) [not null]
+  created_at datetime [not null]
+}
+
+Table inventory_documents {
+  id char(36) [pk, not null, note: "UUID"]
+  vehicle_id char(36) [not null]
+  file_path varchar(500) [not null]
+  created_at datetime [not null]
+}
+
+Table inventory_vehicle_features {
+  vehicle_id char(36) [not null]
+  feature_id bigint [not null, note: "repointed from CHAR(36) legacy `features` table to vehicle_features in V33"]
+  indexes { (vehicle_id, feature_id) [pk] }
+  Note: "ON DELETE CASCADE from vehicle_features — a DELETE-based reseed of vehicle_features wipes these rows, see DATABASE_DESIGN.md gotcha #6"
+}
+
+Table inventory_vehicle_tags {
+  vehicle_id char(36) [not null]
+  tag_id bigint [not null, note: "repointed from CHAR(36) legacy `tags` table to vehicle_tags in V33"]
+  indexes { (vehicle_id, tag_id) [pk] }
+  Note: "ON DELETE CASCADE from vehicle_tags — a DELETE-based reseed of vehicle_tags wipes these rows, see DATABASE_DESIGN.md gotcha #6"
+}
+
+// ===== VEHICLE CATALOG / TAXONOMY — avto.jp-synced reference data (V27, V32, altered V33/V38, seeded V34-37) =====
+
+Table vehicle_brands {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  code varchar(100) [unique, note: "added V38, raw vendor MARKA_NAME, used to dedupe re-syncs"]
+  status tinyint [not null, default: 1, note: "1=active, 0=draft"]
+  deleted_at datetime [note: "soft delete"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table vehicle_models {
+  id bigint [pk, increment, not null]
+  vehicle_brand_id bigint [not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  code varchar(100) [note: "added V38, unique scoped to (vehicle_brand_id, code)"]
+  status tinyint [not null, default: 1]
+  deleted_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { (vehicle_brand_id, code) [unique] }
+}
+
+Table vehicle_grades {
+  id bigint [pk, increment, not null]
+  vehicle_model_id bigint [not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  code varchar(100) [note: "added V38, unique scoped to (vehicle_model_id, code)"]
+  status tinyint [not null, default: 1]
+  deleted_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { (vehicle_model_id, code) [unique] }
+}
+
+Table vehicle_drives {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  code varchar(100) [unique, note: "added V38, raw vendor PRIV"]
+  status tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table vehicle_colors {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  code varchar(100) [unique, note: "raw vendor value"]
+  status tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table vehicle_transmissions {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  code varchar(100) [unique, note: "raw vendor KPP value"]
+  style varchar(16) [note: "CVT | AM | MT | AT"]
+  status tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table vehicle_fuel_types {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  status tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  Note: "created V32, seeded with 9 rows in V34"
+}
+
+Table vehicle_body_styles {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  status tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  Note: "created V32, seeded with ~17 rows in V35"
+}
+
+Table vehicle_features {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  status tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  Note: "created V32, data-migrated from legacy `features` in V33, reseeded (~130 canonical rows) in V36 — see DATABASE_DESIGN.md gotcha #6"
+}
+
+Table vehicle_tags {
+  id bigint [pk, increment, not null]
+  slug varchar(150) [not null, unique]
+  name varchar(150) [not null]
+  status tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  Note: "created V32, data-migrated from legacy `tags` in V33, reseeded (9 canonical rows) in V37 — see DATABASE_DESIGN.md gotcha #6"
+}
+
+// ===== AUTO PARTS (V39, V42, altered V47) =====
+
+Table auto_parts {
+  id char(36) [pk, not null, default: `(UUID())`]
+  slug varchar(255) [not null, unique]
+  stock_id varchar(255) [not null, unique, note: "NOT NULL + UNIQUE since V47"]
+  vehicle_brand_id bigint
+  vehicle_model_id bigint
+  stock_type varchar(32) [not null, default: "Real Stock"]
+  status varchar(50) [not null, default: "ACTIVE"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table auto_part_images {
+  id char(36) [pk, not null, note: "UUID"]
+  auto_part_id char(36) [not null]
+  url varchar(500) [not null]
+  is_primary boolean [default: false]
+  sort_order int
+  created_at datetime [not null]
+}
+
+Table auto_part_prices {
+  id char(36) [pk, not null, note: "UUID"]
+  auto_part_id char(36) [not null, unique]
+  price decimal(15,2)
+  quantity int
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table auto_part_tags {
+  auto_part_id char(36) [not null]
+  tag_id bigint [not null]
+  indexes { (auto_part_id, tag_id) [pk] }
+}
+
+Table auto_parts_inquiries {
+  id char(36) [pk, not null, note: "UUID"]
+  auto_part_id char(36)
+  name varchar(255)
+  email varchar(255)
+  message text
+  status varchar(32) [not null, default: "NEW"]
+  created_at datetime [not null]
+}
+
+Table auto_parts_meta {
+  id char(36) [pk, not null, note: "UUID"]
+  auto_part_id char(36) [not null]
+  meta_key varchar(100) [not null]
+  meta_value text
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { meta_key }
+}
+
+// ===== PUBLIC STOCK SITE SUPPORT & NOTIFICATIONS (V41, V43, V45) =====
+
+Table stock_vehicle_views {
+  vehicle_id varchar(36) [pk, not null]
+  view_count bigint [not null, default: 0]
+  updated_at datetime [not null]
+  Note: "Despite the migration filename (V41__create_stock_vehicle_views.sql), this is a physical table, not a SQL VIEW. Owned/written by public-api only."
+}
+
+Table stock_price_inquiries {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [note: "nullable"]
+  vehicle_id varchar(36) [note: "external AVTO vehicle id"]
+  name varchar(255)
+  email varchar(255)
+  phone varchar(64)
+  status varchar(32) [not null, default: "NEW"]
+  created_at datetime [not null]
+}
+
+Table notifications {
+  id char(36) [pk, not null, note: "UUID"]
+  user_id char(36) [not null]
+  type varchar(64) [not null]
+  reference_type varchar(64)
+  reference_id varchar(36)
+  message text
+  read_at datetime [note: "nullable"]
+  created_at datetime [not null]
+}
+
+// ===== BLOG (V51) =====
+
+Table articles {
+  id bigint [pk, increment, not null]
+  title varchar(255) [not null]
+  introduction text
+  description longtext
+  slug varchar(255) [not null, unique]
+  status tinyint [not null, default: 0, note: "1=published, 0=draft"]
+  image varchar(255)
+  deleted_at datetime [note: "soft delete"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table art_tags {
+  id bigint [pk, increment, not null]
+  name varchar(255) [not null]
+  slug varchar(255) [not null, unique]
+  image varchar(255)
+  status tinyint [not null, default: 0, note: "1=active, 0=draft"]
+  deleted_at datetime [note: "soft delete"]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+}
+
+Table article_art_tags {
+  id bigint [pk, increment, not null]
+  article_id bigint [not null]
+  art_tag_id bigint [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes { (article_id, art_tag_id) [unique] }
+}
+
+// ===== FOREIGN KEY REFERENCES =====
+
+// Auth & RBAC
+Ref: user_roles.user_id > users.id
+Ref: user_roles.role_id > roles.id
+Ref: role_permissions.role_id > roles.id
+Ref: role_permissions.permission_id > permissions.id
+
+// Users, profile, recovery & preferences
+Ref: users_meta.user_id > users.id
+Ref: user_status_history.user_id > users.id
+Ref: email_verification_tokens.user_id > users.id [delete: cascade]
+Ref: password_reset_tokens.user_id > users.id [delete: cascade]
+Ref: recovery_codes.user_id > users.id [delete: cascade]
+Ref: user_recovery_answers.user_id > users.id [delete: cascade]
+Ref: user_recovery_answers.question_id > recovery_questions.id
+Ref: session_termination_logs.user_id > users.id [delete: cascade]
+Ref: user_consents.user_id > users.id [delete: cascade]
+Ref: user_communication_preferences.user_id > users.id [delete: cascade]
+Ref: user_favourite_items.user_id > users.id [delete: cascade]
+
+// Orders
+Ref: orders.user_id > users.id
+Ref: order_items.order_id > orders.id
+Ref: order_statuses.order_id > orders.id
+Ref: order_statuses.user_id > users.id
+Ref: order_item_statuses.order_item_id > order_items.id
+Ref: order_item_statuses.user_id > users.id
+Ref: order_documents.order_id > orders.id
+
+// Case management
+Ref: cases.customer_id > users.id [delete: cascade]
+Ref: cases.created_by_user_id > users.id
+Ref: cases.customer_assigned_by_admin_id > users.id
+Ref: case_bid_groups.case_id > cases.id [delete: cascade]
+Ref: case_vehicles.case_id > cases.id [delete: cascade]
+Ref: case_bid_group_vehicles.case_bid_group_id > case_bid_groups.id [delete: cascade]
+Ref: case_bid_group_vehicles.case_vehicle_id > case_vehicles.id [delete: cascade]
+Ref: case_vehicle_metadata.case_vehicle_id > case_vehicles.id [delete: cascade]
+Ref: case_documents.case_id > cases.id [delete: cascade]
+Ref: case_documents.case_vehicle_id > case_vehicles.id [delete: cascade]
+Ref: case_documents.uploaded_by_user_id > users.id
+Ref: case_documents.verified_by_user_id > users.id
+Ref: case_advance_payments.case_id > cases.id [delete: cascade]
+Ref: case_advance_payments.required_by_admin_id > users.id
+Ref: case_advance_payments.verified_by_finance_id > users.id
+Ref: case_advance_payments.payment_proof_document_id > case_documents.id
+Ref: case_bid_group_remarks.case_bid_group_id > case_bid_groups.id [delete: cascade]
+Ref: case_shipments.case_id > cases.id [delete: cascade]
+Ref: case_shipment_vehicles.shipment_id > case_shipments.id [delete: cascade]
+Ref: case_shipment_vehicles.case_vehicle_id > case_vehicles.id [delete: cascade]
+Ref: case_status_history.case_id > cases.id [delete: cascade]
+Ref: case_status_history.changed_by_user_id > users.id
+Ref: case_status_history.acte_by_user_id > users.id
+Ref: case_messages.case_id > cases.id [delete: cascade]
+Ref: case_messages.case_vehicle_id > case_vehicles.id [delete: cascade]
+Ref: case_messages.sender_user_id > users.id
+Ref: case_activities.case_id > cases.id [delete: cascade]
+Ref: case_activities.case_vehicle_id > case_vehicles.id [delete: cascade]
+Ref: case_activities.actor_user_id > users.id
+Ref: case_staff_assignments.case_id > cases.id [delete: cascade]
+Ref: case_staff_assignments.assigned_to_user_id > users.id
+Ref: case_staff_assignments.assigned_by_user_id > users.id
+Ref: case_feedback.case_vehicle_id > case_vehicles.id [delete: cascade]
+Ref: case_feedback.submitted_by_user_id > users.id
+
+// Manual inventory
+Ref: inventory_vehicle_metadata.vehicle_id > inventory_vehicles.id [delete: cascade]
+Ref: inventory_images.vehicle_id > inventory_vehicles.id [delete: cascade]
+Ref: inventory_videos.vehicle_id > inventory_vehicles.id [delete: cascade]
+Ref: inventory_documents.vehicle_id > inventory_vehicles.id [delete: cascade]
+Ref: inventory_vehicle_features.vehicle_id > inventory_vehicles.id [delete: cascade]
+Ref: inventory_vehicle_features.feature_id > vehicle_features.id [delete: cascade]
+Ref: inventory_vehicle_tags.vehicle_id > inventory_vehicles.id [delete: cascade]
+Ref: inventory_vehicle_tags.tag_id > vehicle_tags.id [delete: cascade]
+
+// Vehicle catalog
+Ref: vehicle_models.vehicle_brand_id > vehicle_brands.id [delete: cascade]
+Ref: vehicle_grades.vehicle_model_id > vehicle_models.id [delete: cascade]
+
+// Auto parts
+Ref: auto_parts.vehicle_brand_id > vehicle_brands.id
+Ref: auto_parts.vehicle_model_id > vehicle_models.id
+Ref: auto_part_images.auto_part_id > auto_parts.id [delete: cascade]
+Ref: auto_part_prices.auto_part_id > auto_parts.id [delete: cascade]
+Ref: auto_part_tags.auto_part_id > auto_parts.id [delete: cascade]
+Ref: auto_part_tags.tag_id > vehicle_tags.id [delete: cascade]
+Ref: auto_parts_meta.auto_part_id > auto_parts.id [delete: cascade]
+
+// Public stock site support & notifications
+Ref: stock_price_inquiries.user_id > users.id
+Ref: notifications.user_id > users.id [delete: cascade]
+
+// Blog
+Ref: article_art_tags.article_id > articles.id [delete: cascade]
+Ref: article_art_tags.art_tag_id > art_tags.id [delete: cascade]
