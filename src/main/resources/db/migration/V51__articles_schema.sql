@@ -1,6 +1,6 @@
--- V51: Blog articles (articles, art_tags, article_art_tags) + article permissions
+-- V51: Blog articles (blog_articles, blog_tags, blog_article_tags) + article permissions
 
-CREATE TABLE IF NOT EXISTS `articles` (
+CREATE TABLE IF NOT EXISTS `blog_articles` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
   `introduction` text,
@@ -12,10 +12,10 @@ CREATE TABLE IF NOT EXISTS `articles` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `articles_slug_unique` (`slug`)
+  UNIQUE KEY `blog_articles_slug_unique` (`slug`)
 );
 
-CREATE TABLE IF NOT EXISTS `art_tags` (
+CREATE TABLE IF NOT EXISTS `blog_tags` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   `slug` varchar(255) NOT NULL,
@@ -25,20 +25,20 @@ CREATE TABLE IF NOT EXISTS `art_tags` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `art_tags_slug_unique` (`slug`)
+  UNIQUE KEY `blog_tags_slug_unique` (`slug`)
 );
 
-CREATE TABLE IF NOT EXISTS `article_art_tags` (
+CREATE TABLE IF NOT EXISTS `blog_article_tags` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `article_id` bigint unsigned NOT NULL,
   `art_tag_id` bigint unsigned NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `article_art_tags_article_id_art_tag_id_unique` (`article_id`, `art_tag_id`),
-  KEY `article_art_tags_art_tag_id_foreign` (`art_tag_id`),
-  CONSTRAINT `article_art_tags_article_id_foreign` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `article_art_tags_art_tag_id_foreign` FOREIGN KEY (`art_tag_id`) REFERENCES `art_tags` (`id`) ON DELETE CASCADE
+  UNIQUE KEY `blog_article_tags_article_id_art_tag_id_unique` (`article_id`, `art_tag_id`),
+  KEY `blog_article_tags_art_tag_id_foreign` (`art_tag_id`),
+  CONSTRAINT `blog_article_tags_article_id_foreign` FOREIGN KEY (`article_id`) REFERENCES `blog_articles` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `blog_article_tags_art_tag_id_foreign` FOREIGN KEY (`art_tag_id`) REFERENCES `blog_tags` (`id`) ON DELETE CASCADE
 );
 
 -- Article permissions
