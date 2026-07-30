@@ -1,8 +1,13 @@
 -- V49: Vendor/master-data tables for Transport, Inspection, and Shipping
--- workflows (booking companies + destinations), plus their permissions.
+-- workflows (vendors + destinations), plus their permissions.
+--
+-- Transport/Inspection/Shipping vendors share an identical shape and are
+-- managed by the same audience, so they live in one table distinguished by
+-- `type` rather than three near-identical tables.
 
-CREATE TABLE IF NOT EXISTS transport_booking_companies (
+CREATE TABLE IF NOT EXISTS vendors (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    type ENUM('TRANSPORT', 'INSPECTION', 'SHIPPING') NOT NULL,
     company_name VARCHAR(255) NOT NULL,
     contact_person VARCHAR(255),
     phone VARCHAR(50),
@@ -15,41 +20,7 @@ CREATE TABLE IF NOT EXISTS transport_booking_companies (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    INDEX idx_transport_booking_companies_status (status)
-);
-
-CREATE TABLE IF NOT EXISTS inspection_booking_companies (
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    company_name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
-    phone VARCHAR(50),
-    email VARCHAR(255),
-    address VARCHAR(500),
-    notes VARCHAR(1000),
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1: active, 0: inactive',
-
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    INDEX idx_inspection_booking_companies_status (status)
-);
-
-CREATE TABLE IF NOT EXISTS shipping_booking_companies (
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    company_name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
-    phone VARCHAR(50),
-    email VARCHAR(255),
-    address VARCHAR(500),
-    notes VARCHAR(1000),
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1: active, 0: inactive',
-
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    INDEX idx_shipping_booking_companies_status (status)
+    INDEX idx_vendors_type_status (type, status)
 );
 
 CREATE TABLE IF NOT EXISTS destinations (
