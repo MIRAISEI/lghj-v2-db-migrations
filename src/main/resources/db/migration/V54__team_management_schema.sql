@@ -1,4 +1,4 @@
--- V53: Team management (departments, designations, team_members) + team permissions
+-- V54: Team management (departments, designations, team_members) + team permissions
 
 CREATE TABLE IF NOT EXISTS `departments` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
