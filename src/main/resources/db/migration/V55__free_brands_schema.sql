@@ -1,6 +1,8 @@
 -- V55: Free brand of the week (home hero auction vehicles) + free-brand permissions
 
-CREATE TABLE IF NOT EXISTS `free_brands` (
+DROP TABLE IF EXISTS `free_brands`;
+
+CREATE TABLE `free_brands` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `vehicle_brand_id` bigint unsigned NOT NULL,
   `name` varchar(255) DEFAULT NULL,
