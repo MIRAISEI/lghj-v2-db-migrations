@@ -257,6 +257,21 @@ Permissions: `ARTICLE_READ`/`ARTICLE_WRITE`/`ARTICLE_DELETE` (V51), granted in f
 
 ---
 
+## 12. Free brand of the week (home hero auction vehicles)
+
+| Table | Purpose | Key columns | FKs |
+|---|---|---|---|
+| `free_brands` | Admin-set "which brand is free this week"; the row with the highest `id` (excluding soft-deleted) is the active one | soft-deleted via `deleted_at` | `vehicle_brand_id`→vehicle_brands.id (CASCADE) |
+| `free_auction_vehicles` | Cache of vehicles fetched from the external avto.jp API for the active free brand; fully truncated and re-fetched by a `public-api` scheduled job every 30 min | `vehicle_id`, `thumbnail_url`, `brand`, `model`, `auction_date` (all denormalized snapshot fields, not FKs into vehicle catalog) | `free_brand_id`→free_brands.id (CASCADE) |
+
+Owned by `lghj-v2-admin-api` (CRUD on `free_brands` — creating a new row is what "rotates" the free brand) and
+`lghj-v2-public-api` (read-only `free_brands` access + all `free_auction_vehicles` writes via the refresh job,
+plus the public `GET /auctions/cars/free-brand` read endpoint).
+
+Permissions: `FREE_BRAND_READ`/`FREE_BRAND_WRITE`/`FREE_BRAND_DELETE` (V55), granted in full to `ADMIN`.
+
+---
+
 ## Schema evolution & gotchas
 
 Numbered for reference; check this list before writing code that assumes "obvious" behavior.
