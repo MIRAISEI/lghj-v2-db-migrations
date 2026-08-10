@@ -1,8 +1,10 @@
 # Database Design — `lgh_system_v2`
 
 **Status:** current as of `db-migrations` V48 (`V48__user_communication_preferences_schema.sql`), plus V51
-(`V51__articles_schema.sql`, blog domain), 2026-07-29. **V49/V50/V52** (vendor & destination master-data
-tables, and the V52 booking-companies consolidation) are not yet reflected in this document.
+(`V51__articles_schema.sql`, blog domain), V55 (`V55__free_brands_schema.sql`, free brand domain), and V57
+(`V57__testimonials_schema.sql`, testimonials domain), 2026-08-10. **V49/V50/V52/V54** (vendor & destination
+master-data tables, the V52 booking-companies consolidation, and team management) are not yet reflected in
+this document.
 
 ## Source of truth
 
@@ -269,6 +271,20 @@ Owned by `lghj-v2-admin-api` (CRUD on `free_brands` — creating a new row is wh
 plus the public `GET /auctions/cars/free-brand` read endpoint).
 
 Permissions: `FREE_BRAND_READ`/`FREE_BRAND_WRITE`/`FREE_BRAND_DELETE` (V55), granted in full to `ADMIN`.
+
+---
+
+## 13. Testimonials
+
+| Table | Purpose | Key columns | FKs |
+|---|---|---|---|
+| `testimonials` | Customer testimonials managed via the Admin Portal, shown on the public home page | `is_active` (default `1`) controls public visibility; `sort_order` controls display order; soft-deleted via `deleted_at` | none |
+
+Owned by `lghj-v2-admin-api` (full CRUD, activate/deactivate, drag-and-drop reorder via `PUT
+/testimonials/reorder`) and `lghj-v2-public-api` (read-only, `GET /testimonials` returns only
+`is_active = 1` rows ordered by `sort_order`).
+
+Permissions: `TESTIMONIAL_READ`/`TESTIMONIAL_WRITE`/`TESTIMONIAL_DELETE` (V57), granted in full to `ADMIN`.
 
 ---
 
