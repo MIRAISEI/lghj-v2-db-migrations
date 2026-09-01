@@ -90,6 +90,11 @@ database does not own, so those columns are intentionally not FK'd.
 | V31 | — | Extends `CASE_READ` to FINANCE and SHIPPING (all 5 staff roles can now view cases) |
 | V40 | `AUTO_PARTS_READ/WRITE/DELETE`, `AUTO_PARTS_INQUIRY_READ/WRITE` | ADMIN all; BIDDING/SALES→READ; SALES also gets both INQUIRY perms |
 | V44 | `STOCK_INQUIRY_READ/WRITE` | ADMIN, SALES |
+| V49 | `VENDOR_READ/WRITE/DELETE`, `CASE_LOGISTICS_MANAGE` | ADMIN all; SHIPPING all; BIDDING/SALES/FINANCE→VENDOR_READ |
+| V51 | `ARTICLE_READ/WRITE/DELETE` | ADMIN only |
+| V55 | `FREE_BRAND_READ/WRITE/DELETE` | ADMIN only |
+| V57 | `TESTIMONIAL_READ/WRITE/DELETE` | ADMIN only |
+| V71 | `CASE_INSPECTION_MANAGE`, `CASE_CHARGE_VERIFY` | ADMIN all; SHIPPING→INSPECTION_MANAGE; FINANCE→CHARGE_VERIFY. Backfills what V66 (inspection workflow) created tables for but never seeded — without this, `DATA_INITIALIZATION_ENABLED=false` environments 403 on every inspection endpoint |
 
 Conventions: permission names are `<DOMAIN>_<ACTION>`; every migration that adds a permission
 re-grants the full permission set to `ADMIN` via `INSERT IGNORE ... CROSS JOIN permissions`, so ADMIN
