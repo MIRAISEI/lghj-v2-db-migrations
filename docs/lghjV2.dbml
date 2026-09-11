@@ -344,6 +344,8 @@ Table case_vehicles {
   case_id char(36) [not null]
   vehicle_id char(36) [note: "external AVTO auction vehicle id, not FK'd"]
   vehicle_status varchar(32) [note: "PENDING | IN_BIDDING | BID_WIN | BID_LOSS | IGNORED | IN_INVENTORY (added V25)"]
+  purchase_status varchar(32) [note: "PENDING | PURCHASED | CANCELLED, default PENDING (added V72) — staff-set purchase outcome for a won vehicle"]
+  winning_bid_price decimal(15,2) [note: "present since V6 baseline but dead until V72; now written as the staff-entered Purchase Value"]
   cif_breakdown_json json
   metadata_json json
   created_at datetime [not null]
