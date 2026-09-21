@@ -81,7 +81,35 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
--- ── 3. Backfill the arrangement-level values from what vehicles held ─────────
+-- ── 3. case_shipment_vehicles: columns the backfill below reads ──────────────
+-- CaseShipmentVehicle has always mapped payment_status and shipment_tracking_no,
+-- but no earlier migration created them (existing databases got them from
+-- hibernate.ddl-auto=update). Create them where missing so a fresh database
+-- can run the backfill; a no-op everywhere the columns already exist.
+
+SET @exists = (
+    SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'case_shipment_vehicles' AND column_name = 'payment_status'
+);
+SET @sql = IF(@exists = 0,
+    'ALTER TABLE case_shipment_vehicles ADD COLUMN payment_status VARCHAR(50) NULL',
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @exists = (
+    SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'case_shipment_vehicles' AND column_name = 'shipment_tracking_no'
+);
+SET @sql = IF(@exists = 0,
+    'ALTER TABLE case_shipment_vehicles ADD COLUMN shipment_tracking_no VARCHAR(255) NULL',
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ── 4. Backfill the arrangement-level values from what vehicles held ─────────
 
 -- Transport payment status: PAID only if every linked vehicle / leg was PAID,
 -- otherwise UNPAID. Arrangements that already carry a value are left alone.
