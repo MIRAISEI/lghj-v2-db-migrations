@@ -518,6 +518,9 @@ Table case_feedback {
 Table inventory_vehicles {
   id char(36) [pk, not null, default: `(UUID())`]
   stock_id varchar(255) [not null, unique, note: "NOT NULL + UNIQUE since V47, see DATABASE_DESIGN.md gotcha #9 re: required backfill"]
+  stock_type varchar(50) [not null, default: "Real Stock", note: "V76: 'Public Stock' = public-portal listing, anything else = internal real stock. See DATABASE_DESIGN.md gotcha #17"]
+  source_vehicle_id char(36) [unique, note: "V76: real vehicle a public listing was copied from (FK self, SET NULL); NULL for real stock and direct public listings"]
+  last_synced_at datetime [note: "V76: when a public copy was last created/synced from its source"]
   case_vehicle_id char(36) [note: "soft reference to case_vehicles when promoted from a won bid, no FK constraint"]
   source_case_id char(36) [note: "soft reference to cases for navigation, no FK constraint"]
   status varchar(50) [not null, default: "ACTIVE"]
@@ -526,8 +529,11 @@ Table inventory_vehicles {
   indexes {
     case_vehicle_id
     source_case_id
+    stock_type
   }
 }
+
+Ref: inventory_vehicles.source_vehicle_id > inventory_vehicles.id [delete: set null]
 
 Table inventory_vehicle_metadata {
   id char(36) [pk, not null, note: "UUID"]
