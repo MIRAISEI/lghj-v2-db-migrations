@@ -816,6 +816,31 @@ Table blog_article_tags {
   indexes { (article_id, art_tag_id) [unique] }
 }
 
+// ===== EXCHANGE RATES (V81) =====
+
+Table exchange_rates {
+  id bigint [pk, increment, not null]
+  country varchar(100) [not null, note: "country name"]
+  currency varchar(10) [not null, note: "ISO 4217"]
+  rate decimal(15,4) [not null, note: "units of currency per 1 JPY"]
+  expire_date date
+  created_by_user_id char(36)
+  created_at datetime [not null, note: "append-only; newest row per country is active"]
+  indexes { (country, created_at) }
+}
+
+Table case_exchange_rates {
+  id char(36) [pk, not null, note: "UUID"]
+  case_id char(36) [not null]
+  target enum [not null, note: "ADVANCE | BALANCE"]
+  rate decimal(15,4) [not null, note: "units of currency per 1 JPY"]
+  currency varchar(10) [not null, note: "ISO 4217"]
+  expire_date date
+  set_by_user_id char(36)
+  created_at datetime [not null, note: "append-only; newest row per (case, target) is current"]
+  indexes { (case_id, target, created_at) }
+}
+
 // ===== FOREIGN KEY REFERENCES =====
 
 // Auth & RBAC
@@ -908,6 +933,11 @@ Ref: auto_parts_meta.auto_part_id > auto_parts.id [delete: cascade]
 // Public stock site support & notifications
 Ref: stock_price_inquiries.user_id > users.id
 Ref: notifications.user_id > users.id [delete: cascade]
+
+// Exchange rates
+Ref: exchange_rates.created_by_user_id > users.id [delete: set null]
+Ref: case_exchange_rates.case_id > cases.id [delete: cascade]
+Ref: case_exchange_rates.set_by_user_id > users.id [delete: set null]
 
 // Blog
 Ref: blog_article_tags.article_id > blog_articles.id [delete: cascade]
