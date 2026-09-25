@@ -2,7 +2,7 @@
 
 **Status:** current as of `db-migrations` V48 (`V48__user_communication_preferences_schema.sql`), plus V51
 (`V51__articles_schema.sql`, blog domain), V55 (`V55__free_brands_schema.sql`, free brand domain), and V57
-(`V57__testimonials_schema.sql`, testimonials domain), 2026-08-10. **V49/V50/V52/V54** (vendor & destination
+(`V57__testimonials_schema.sql`, testimonials domain), 2026-08-10, plus V81 (exchange rates, 2026-09-26). **V49/V50/V52/V54** (vendor & destination
 master-data tables, the V52 booking-companies consolidation, and team management) are not yet reflected in
 this document.
 
@@ -53,6 +53,7 @@ Whenever a migration is added to this repo:
 | Public stock site support | `stock_vehicle_views`, `stock_price_inquiries` |
 | Notifications | `notifications` |
 | Blog | `blog_articles`, `blog_tags`, `blog_article_tags` |
+| Exchange rates | `exchange_rates`, `case_exchange_rates` |
 
 Cross-domain link: a won bid in **Case management** can be "promoted" into **Manual inventory**
 (`inventory_vehicles.case_vehicle_id` / `.source_case_id`, loosely coupled — see gotcha #12 below).
@@ -181,6 +182,7 @@ All originated in **V6**, a single migration whose internal comments still say "
 | `case_messages` | Threaded case/vehicle messages | `message_type` ENUM(`USER_MESSAGE`,`SYSTEM_NOTE`,`STATUS_CHANGE`); `visibility` ENUM(`CUSTOMER_AND_STAFF`,`STAFF_ONLY`) | `case_id`→cases.id (CASCADE); `case_vehicle_id`→case_vehicles.id (CASCADE, nullable); `sender_user_id`→users.id (SET NULL) |
 | `case_activities` | Generic activity/audit trail | `metadata_json` JSON; microsecond `created_at` | `case_id`→cases.id (CASCADE); `case_vehicle_id`→case_vehicles.id (CASCADE, nullable); `actor_user_id`→users.id (SET NULL) |
 | `case_staff_assignments` | Staff role assignment per case | — | `case_id`→cases.id (CASCADE); `assigned_to_user_id`/`assigned_by_user_id`→users.id (SET NULL) |
+| `case_exchange_rates` | Exchange rate applied to an order's payment stage (V81); append-only — newest row per (`case_id`,`target`) is current, all rows are the audit trail | `target` ENUM(`ADVANCE`,`BALANCE`); `rate` DECIMAL(15,4) per 1 JPY; `currency`; `expire_date` DATE; idx(`case_id`,`target`,`created_at`) | `case_id`→cases.id (CASCADE); `set_by_user_id`→users.id (SET NULL) |
 | `case_feedback` | One customer feedback/rating per vehicle | `case_vehicle_id` UNIQUE | `case_vehicle_id`→case_vehicles.id (CASCADE); `submitted_by_user_id`→users.id (SET NULL) |
 
 † `IN_INVENTORY` added in V25 to support promoting a bid-won vehicle into Manual Inventory.
@@ -291,6 +293,19 @@ Owned by `lghj-v2-admin-api` (full CRUD, activate/deactivate, drag-and-drop reor
 
 Permissions: `TESTIMONIAL_READ`/`TESTIMONIAL_WRITE`/`TESTIMONIAL_DELETE` (V57), granted in full to `ADMIN`.
 
+## 14. Exchange rates (V81)
+
+| Table | Purpose | Key columns | FKs |
+|---|---|---|---|
+| `exchange_rates` | Global Settings: exchange rate per country | `country` (name, as in the admin country picker), `currency` (ISO 4217), `rate` DECIMAL(15,4) = units of currency per 1 JPY, `expire_date` DATE nullable; **append-only** — create and edit both insert a row, the newest row per country is the active rate, older rows are its history; idx(`country`,`created_at`) | `created_by_user_id`→users.id (SET NULL) |
+| `case_exchange_rates` | Rate applied to one order's payment stage — see section 6 | | |
+
+`cases` deliberately has **no** exchange-rate columns: the current rate of a stage is always derived from
+the newest `case_exchange_rates` row, so there is one source of truth and a new payment stage is a new
+`target` ENUM value, not new columns. Owned by `lghj-v2-admin-api`. Permissions:
+`EXCHANGE_RATE_READ`/`_WRITE`/`_DELETE` (V81) — READ to ADMIN/BIDDING/SALES/SHIPPING/FINANCE, WRITE to
+ADMIN/BIDDING, DELETE to ADMIN; reading global rates is also allowed with `CASE_READ`.
+
 ---
 
 ## Schema evolution & gotchas
@@ -317,6 +332,8 @@ Numbered for reference; check this list before writing code that assumes "obviou
 17. **`inventory_vehicles` holds two kinds of stock (V76).** `stock_type = 'Public Stock'` rows are public-portal listings — the only rows public-api shows (with `status = 'ACTIVE'`). Every other `stock_type` (`Real Stock`, `Dealer Stock`, `Auction Stock`, …) is internal real stock, never shown publicly and the only kind a case can pick from or be assigned to a customer. A public row is either created directly (`source_vehicle_id` NULL) or copied from a real vehicle (`source_vehicle_id` set, UNIQUE = at most one public copy per real vehicle). Copies are independent snapshots — editing one never touches the other — and are only re-synced when staff ask (`last_synced_at`). Copies share stored media files with their source (rows duplicated, files not), so a file must only be deleted from storage once no `inventory_images`/`inventory_videos` row references it. A public row's `status` is only ever `ACTIVE` (on the portal) or `DRAFT` (not) — enforced by admin-api, not the schema; V76 sets any relabelled dummy row with another status to `DRAFT`. Public stock ids are prefixed `P-`. `stock_type` used to be an `inventory_vehicle_metadata` key (`meta_key = 'stock_type'`); V76 promotes it to the column and deletes those metadata rows. V76 also relabels unassigned `Dummy Stock` rows (the old public-only entries) to `Public Stock` and creates a linked public copy of every currently published (`ACTIVE`, unassigned) real vehicle, so the portal looks the same after it ships.
 
 18. **Transport / shipment arrangements own status, payment, tracking and documents (V78).** While a vehicle (or one of its extra transport legs) is linked to an arrangement there is no per-vehicle version of: transport status, transport payment status, transport attachments, transport payment receipt (`transport_arrangements`), or shipment tracking no. and Attachment BL (`shipment_arrangements.shipment_tracking_no` is new in V78; `transport_arrangements.payment_status` has existed since V60 but was unused). The vehicle's own columns are left stale and every read resolves through the arrangement; admin-api rejects vehicle-level edits of them while linked. Arrangement documents are ordinary `case_documents` rows, **one per linked vehicle sharing one stored file**, tagged with the new `transport_arrangement_id` / `shipment_arrangement_id` (indexed soft references, no FK) so the arrangement can list, add and remove them as one set — which also means every existing read path (case tabs, customer portal) shows them on each vehicle unchanged, so **each customer sees the shared documents, including a shared truck's payment receipt**. Vehicles joining later get copies; unlinking soft-deletes that vehicle's copies; deleting the arrangement soft-deletes them all. For a leg-linked vehicle the row's `document_type` is `LEG_<n>_TRANSPORT_DOC` / `LEG_<n>_TRANSPORT_PAYMENT_RECEIPT`. Documents uploaded per vehicle before V78 carry neither column and stay ordinary per-vehicle documents. `case_shipment_vehicles.payment_status` is still shared with the Inspection tab's payment status (exposed as `inspectionPaymentStatus` in the API, unaffected by the arrangement). V78 backfills each arrangement's payment status (`PAID` only if every linked vehicle/leg was `PAID`, else `UNPAID`) and tracking no. (distinct vehicle values, comma-separated).
+
+19. **V81 partly lands over Hibernate-created tables.** `exchange_rates` first shipped as a JPA entity only (created by `ddl-auto=update` on some local DBs), so V81 creates it with `IF NOT EXISTS` and brings an existing one up to shape with information_schema-guarded ALTERs. An earlier, never-merged draft of the feature also let Hibernate create `system_settings`, `case_exchange_rate_history` and nine `cases.*exchange_rate*` columns on some local DBs; nothing uses them and no shared environment has them, so V81 ignores them — drop them by hand if present locally.
 
 Related: as of this writing, local dev environments for `admin-api`/`public-api` can't run `flyway migrate`
 past V47 until pre-existing `inventory_vehicles.stock_id` duplicates in the local dev DB are cleaned up
