@@ -15,7 +15,7 @@
 
 ALTER TABLE case_exchange_rates
     MODIFY COLUMN target ENUM('ADVANCE', 'BALANCE') NULL
-        COMMENT 'Legacy (pre-V82): payment stage the rate was set for. NULL for per-order rates';
+        COMMENT 'Legacy (pre-V83): payment stage the rate was set for. NULL for per-order rates';
 
 -- Per-order history / "rate at time T" lookups no longer filter on target.
 ALTER TABLE case_exchange_rates
