@@ -7,6 +7,14 @@ Maven artifact instead of keeping their own copy of
 scanning picks up migrations from any jar on the classpath, including this
 one, so there is exactly one physical copy of every migration file.
 
+## Schema documentation
+
+See [`docs/DATABASE_DESIGN.md`](docs/DATABASE_DESIGN.md) for a human-readable, domain-by-domain summary
+of the current schema (tables, FKs, RBAC seed history, and a list of schema-evolution gotchas), and
+[`docs/lghjV2.dbml`](docs/lghjV2.dbml) for an ER diagram source (importable at
+[dbdiagram.io](https://dbdiagram.io)). Both are derived docs — the migrations in this repo are always
+the authority — and should be updated alongside any new migration.
+
 ## Consuming this package
 
 Any project that needs these migrations adds the GitHub Packages repository
