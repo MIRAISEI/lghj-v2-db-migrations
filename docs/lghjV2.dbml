@@ -436,6 +436,7 @@ Table case_shipment_vehicles {
   inspection_result varchar(50) [note: "PENDING | PASS | FAIL"]
   inspection_date datetime
   inspection_notes text
+  shipping_method_id char(36) [note: "V84"]
   created_at datetime [not null]
   indexes {
     shipment_id
@@ -841,6 +842,24 @@ Table case_exchange_rates {
   indexes { (case_id, target, created_at) }
 }
 
+// ===== SHIPPING METHODS (V84) =====
+
+Table shipping_methods {
+  id char(36) [pk, not null, note: "UUID"]
+  name varchar(100) [not null]
+  description varchar(500)
+  sort_order int [not null, default: 0, note: "dropdown order"]
+  status tinyint [not null, default: 1, note: "1 active, 0 inactive"]
+  deleted_at timestamp
+  created_at timestamp
+  updated_at timestamp
+  live_name varchar(100) [note: "generated: LOWER(name) while not deleted"]
+  indexes {
+    live_name [unique]
+    (status, sort_order)
+  }
+}
+
 // ===== FOREIGN KEY REFERENCES =====
 
 // Auth & RBAC
@@ -942,3 +961,6 @@ Ref: case_exchange_rates.set_by_user_id > users.id [delete: set null]
 // Blog
 Ref: blog_article_tags.article_id > blog_articles.id [delete: cascade]
 Ref: blog_article_tags.art_tag_id > blog_tags.id [delete: cascade]
+
+// Shipping methods
+Ref: case_shipment_vehicles.shipping_method_id > shipping_methods.id [delete: set null]
