@@ -23,9 +23,9 @@
 --    paid. voided_at / voided_by_user_id / void_reason record who reversed it
 --    and why.
 --
--- No new permission: requesting a reversal reuses CASE_DEPOSIT_VERIFY /
--- CASE_BALANCE_VERIFY, approving it reuses CHANGE_REQUEST_APPROVE, and reading
--- the audit log reuses CASE_READ. So neither PermissionName enum needs to change.
+-- Requesting a reversal reuses CASE_DEPOSIT_VERIFY / CASE_BALANCE_VERIFY and
+-- approving it reuses CHANGE_REQUEST_APPROVE. Reading the audit log has its own
+-- permission, AUDIT_LOG_READ, seeded by V88.
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS case_audit_events (
