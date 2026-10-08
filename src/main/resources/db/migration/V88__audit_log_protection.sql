@@ -6,8 +6,9 @@
 --    tries (the application's own user, or someone with direct access).
 --    Correcting a mistake is done in the order itself, which writes a new row.
 --
---    Note: with binary logging on, creating triggers needs the TRIGGER privilege
---    plus SUPER, or log_bin_trust_function_creators = 1, for the migration user.
+--    Needs the TRIGGER privilege (and, with binary logging on,
+--    log_bin_trust_function_creators = 1) for the user that runs migrations.
+--    Run scripts/grant-migration-privileges.sql once per environment first.
 --
 -- 2. Its own permission: AUDIT_LOG_READ ("View Order Audit Log") instead of
 --    everyone with CASE_READ. Seeded for ADMIN and for every role that can
