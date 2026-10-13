@@ -2,7 +2,7 @@
 
 **Status:** current as of `db-migrations` V48 (`V48__user_communication_preferences_schema.sql`), plus V51
 (`V51__articles_schema.sql`, blog domain), V55 (`V55__free_brands_schema.sql`, free brand domain), and V57
-(`V57__testimonials_schema.sql`, testimonials domain), 2026-08-10, plus V81 (exchange rates, 2026-09-26). **V49/V50/V52/V54** (vendor & destination
+(`V57__testimonials_schema.sql`, testimonials domain), 2026-08-10, plus V81 (exchange rates, 2026-09-26) and V84 (shipping methods, 2026-10-01). **V49/V50/V52/V54** (vendor & destination
 master-data tables, the V52 booking-companies consolidation, and team management) are not yet reflected in
 this document.
 
@@ -54,6 +54,7 @@ Whenever a migration is added to this repo:
 | Notifications | `notifications` |
 | Blog | `blog_articles`, `blog_tags`, `blog_article_tags` |
 | Exchange rates | `exchange_rates`, `case_exchange_rates` |
+| Shipping methods | `shipping_methods` |
 
 Cross-domain link: a won bid in **Case management** can be "promoted" into **Manual inventory**
 (`inventory_vehicles.case_vehicle_id` / `.source_case_id`, loosely coupled — see gotcha #12 below).
@@ -306,6 +307,19 @@ the newest `case_exchange_rates` row, so there is one source of truth and a new 
 `EXCHANGE_RATE_READ`/`_WRITE`/`_DELETE` (V81) — READ to ADMIN/BIDDING/SALES/SHIPPING/FINANCE, WRITE to
 ADMIN/BIDDING, DELETE to ADMIN; reading global rates is also allowed with `CASE_READ`.
 
+## 15. Shipping methods (V84)
+
+| Table | Purpose | Key columns | FKs |
+|---|---|---|---|
+| `shipping_methods` | Master-data list behind the Shipping tab's "Shipping Method" (seeded RORO, RORO CBM, Container 20 GP, Container 40 HQ, Air Freight) | `name` VARCHAR(100); `description`; `sort_order` (dropdown order); `status` 1 active / 0 inactive; soft delete via `deleted_at`; generated `live_name` = LOWER(`name`) while not deleted, UNIQUE — names are unique among live rows, case-insensitive | — |
+
+Referenced by `shipment_arrangements.shipping_method_id` and `case_shipment_vehicles.shipping_method_id`
+(both SET NULL), which replace the old free-text `shipping_method` columns. Inactive methods still resolve
+on existing shipments but aren't offered for new selections; admin-api refuses to delete a method that's
+in use (deactivate it instead). Owned by `lghj-v2-admin-api`. Permissions:
+`SHIPPING_METHOD_READ`/`_WRITE`/`_DELETE` (V84) — all three to ADMIN/SHIPPING; READ to every role with
+`CASE_LOGISTICS_MANAGE`, which depends on it.
+
 ---
 
 ## Schema evolution & gotchas
@@ -334,6 +348,8 @@ Numbered for reference; check this list before writing code that assumes "obviou
 18. **Transport / shipment arrangements own status, payment, tracking and documents (V78).** While a vehicle (or one of its extra transport legs) is linked to an arrangement there is no per-vehicle version of: transport status, transport payment status, transport attachments, transport payment receipt (`transport_arrangements`), or shipment tracking no. and Attachment BL (`shipment_arrangements.shipment_tracking_no` is new in V78; `transport_arrangements.payment_status` has existed since V60 but was unused). The vehicle's own columns are left stale and every read resolves through the arrangement; admin-api rejects vehicle-level edits of them while linked. Arrangement documents are ordinary `case_documents` rows, **one per linked vehicle sharing one stored file**, tagged with the new `transport_arrangement_id` / `shipment_arrangement_id` (indexed soft references, no FK) so the arrangement can list, add and remove them as one set — which also means every existing read path (case tabs, customer portal) shows them on each vehicle unchanged, so **each customer sees the shared documents, including a shared truck's payment receipt**. Vehicles joining later get copies; unlinking soft-deletes that vehicle's copies; deleting the arrangement soft-deletes them all. For a leg-linked vehicle the row's `document_type` is `LEG_<n>_TRANSPORT_DOC` / `LEG_<n>_TRANSPORT_PAYMENT_RECEIPT`. Documents uploaded per vehicle before V78 carry neither column and stay ordinary per-vehicle documents. `case_shipment_vehicles.payment_status` is still shared with the Inspection tab's payment status (exposed as `inspectionPaymentStatus` in the API, unaffected by the arrangement). V78 backfills each arrangement's payment status (`PAID` only if every linked vehicle/leg was `PAID`, else `UNPAID`) and tracking no. (distinct vehicle values, comma-separated).
 
 19. **V81 partly lands over Hibernate-created tables.** `exchange_rates` first shipped as a JPA entity only (created by `ddl-auto=update` on some local DBs), so V81 creates it with `IF NOT EXISTS` and brings an existing one up to shape with information_schema-guarded ALTERs. An earlier, never-merged draft of the feature also let Hibernate create `system_settings`, `case_exchange_rate_history` and nine `cases.*exchange_rate*` columns on some local DBs; nothing uses them and no shared environment has them, so V81 ignores them — drop them by hand if present locally.
+
+20. **V84 replaced free-text shipping methods with `shipping_methods` references.** Every distinct legacy value that didn't match a seeded name (notably the old generic `CONTAINER`, which can't be mapped to 20 GP vs 40 HQ) was carried over as an **inactive** method with that name, rows were re-pointed by case-insensitive name, then the text columns were dropped. `case_shipment_vehicles.shipping_method` had never been created by a migration (only by `ddl-auto=update`), so V84 touches it only when present.
 
 Related: as of this writing, local dev environments for `admin-api`/`public-api` can't run `flyway migrate`
 past V47 until pre-existing `inventory_vehicles.stock_id` duplicates in the local dev DB are cleaned up

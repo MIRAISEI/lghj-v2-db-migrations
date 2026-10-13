@@ -115,6 +115,21 @@ PAT with `write:packages` scope configured as the `github` server in
 mvn deploy
 ```
 
+## Database privileges (one-time, per environment)
+
+Most migrations only need ordinary DDL/DML rights. **V88** (1.15.0) also creates
+triggers, so the database user that runs migrations (the `DB_USERNAME` of
+admin-api / public-api) also needs:
+
+- the `TRIGGER` privilege on the schema, and
+- if binary logging is on: `log_bin_trust_function_creators = 1`. On RDS/Aurora
+  this is set in the parameter group; avoid granting `SUPER` instead.
+
+Before deploying 1.15.0 to an environment, a DB administrator runs
+[`scripts/grant-migration-privileges.sql`](scripts/grant-migration-privileges.sql)
+once, with the placeholders replaced. Local dev connecting as `root` needs nothing.
+Without it, V88 fails with an access-denied / "you do not have the SUPER privilege" error.
+
 ## Why this exists
 
 Previously each app carried its own `db/migration` folder while both wrote
