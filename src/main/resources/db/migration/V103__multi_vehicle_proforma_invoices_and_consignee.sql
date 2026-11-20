@@ -10,7 +10,10 @@
 --     invoice_index (the -2, -3 suffix of the invoice number);
 --   - proforma_invoice_vehicles holds one line per vehicle;
 --   - proforma_invoice_version_vehicles keeps the lines each version printed;
---   - each version is ACTIVE or INACTIVE.
+--   - each version is ACTIVE or INACTIVE;
+--   - each invoice and version records its currency, terms of delivery and the
+--     applicant's tax ID and email (the layout comes from admin-api's
+--     invoice-profiles.json, by the order's country).
 --
 -- Existing invoices become single-vehicle invoices: same number, same PDFs,
 -- one line copied from their old columns, the current version ACTIVE and the
@@ -255,3 +258,74 @@ SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
     'ALTER TABLE cases ADD COLUMN consignee_email VARCHAR(255) NULL',
     'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+
+-- -----------------------------------------------------------------------------
+-- 6. How each invoice was issued: currency, terms of delivery, and the applicant's
+--    tax ID and email (invoice-profiles.json in admin-api decides the layout by
+--    country; these are what staff chose for the invoice, kept per version so a
+--    version always matches the PDF it printed)
+-- -----------------------------------------------------------------------------
+-- Existing invoices were all issued in JPY on CFR terms (the only layout there
+-- was). A blank value is what Hibernate leaves when it adds a NOT NULL column to
+-- existing rows; those get the same defaults.
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoices' AND column_name = 'currency') = 0,
+    'ALTER TABLE proforma_invoices ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT ''JPY'' AFTER transhipment_allowed',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoices' AND column_name = 'delivery_terms') = 0,
+    'ALTER TABLE proforma_invoices ADD COLUMN delivery_terms VARCHAR(10) NOT NULL DEFAULT ''CFR'' AFTER currency',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoices' AND column_name = 'applicant_tax_id') = 0,
+    'ALTER TABLE proforma_invoices ADD COLUMN applicant_tax_id VARCHAR(50) NULL AFTER applicant_address',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoices' AND column_name = 'applicant_email') = 0,
+    'ALTER TABLE proforma_invoices ADD COLUMN applicant_email VARCHAR(255) NULL AFTER applicant_tax_id',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE proforma_invoices SET currency = 'JPY' WHERE currency IS NULL OR currency = '';
+UPDATE proforma_invoices SET delivery_terms = 'CFR' WHERE delivery_terms IS NULL OR delivery_terms = '';
+ALTER TABLE proforma_invoices
+    MODIFY COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'JPY',
+    MODIFY COLUMN delivery_terms VARCHAR(10) NOT NULL DEFAULT 'CFR';
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoice_versions' AND column_name = 'currency') = 0,
+    'ALTER TABLE proforma_invoice_versions ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT ''JPY'' AFTER transhipment_allowed',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoice_versions' AND column_name = 'delivery_terms') = 0,
+    'ALTER TABLE proforma_invoice_versions ADD COLUMN delivery_terms VARCHAR(10) NOT NULL DEFAULT ''CFR'' AFTER currency',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoice_versions' AND column_name = 'applicant_tax_id') = 0,
+    'ALTER TABLE proforma_invoice_versions ADD COLUMN applicant_tax_id VARCHAR(50) NULL AFTER applicant_address',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF((SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'proforma_invoice_versions' AND column_name = 'applicant_email') = 0,
+    'ALTER TABLE proforma_invoice_versions ADD COLUMN applicant_email VARCHAR(255) NULL AFTER applicant_tax_id',
+    'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE proforma_invoice_versions SET currency = 'JPY' WHERE currency IS NULL OR currency = '';
+UPDATE proforma_invoice_versions SET delivery_terms = 'CFR' WHERE delivery_terms IS NULL OR delivery_terms = '';
+ALTER TABLE proforma_invoice_versions
+    MODIFY COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'JPY',
+    MODIFY COLUMN delivery_terms VARCHAR(10) NOT NULL DEFAULT 'CFR';
